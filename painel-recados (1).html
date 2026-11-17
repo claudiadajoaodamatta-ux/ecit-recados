@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Moderação das frases — ECIT 10 anos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Painel de moderação dos recados. Usa o mesmo Firebase do site 10-anos-ecit.html */
+:root{--marinho:#16233F;--marinho-esc:#0C1529;--azul:#2F62B8;--verde:#2FA35B;--vermelho:#C0392F;--ouro:#E0A92F;
+  --papel:#F6F5F1;--texto:#1B2438;--suave:#5E6678;--linha:rgba(22,35,63,.14);--disp:'Fraunces',Georgia,serif;--corpo:'DM Sans',system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--papel);color:var(--texto);font-family:var(--corpo);line-height:1.5}
+h1,h2,h3,p{margin:0}
+button,input{font:inherit}
+:focus-visible{outline:3px solid var(--ouro);outline-offset:2px}
+.topo{background:var(--marinho);color:#fff;padding:16px 0}
+.wrap{width:min(860px,92vw);margin:0 auto}
+.topo .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.topo h1{font-family:var(--disp);font-size:20px}
+.topo small{color:rgba(255,255,255,.7)}
+.btn{border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;font-size:14px}
+.btn.ok{background:var(--verde);color:#fff}.btn.no{background:var(--vermelho);color:#fff}
+.btn.neutro{background:#fff;color:var(--texto);border:1.5px solid var(--linha)}
+.btn.sair{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.4)}
+.abas{display:flex;gap:8px;margin:24px 0 16px}
+.aba{flex:1;background:#fff;border:1.5px solid var(--linha);border-radius:12px;padding:14px;text-align:center;cursor:pointer;font-weight:700}
+.aba b{display:block;font-family:var(--disp);font-size:28px}
+.aba.on{border-color:var(--azul);background:#EEF3FC;color:var(--azul)}
+.card{background:#fff;border:1px solid var(--linha);border-radius:14px;padding:18px;margin-bottom:12px}
+.card q{display:block;font-size:17px;line-height:1.5;quotes:"“" "”"}
+.meta{margin-top:10px;font-size:13px;color:var(--suave)}
+.acoes{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.topo-card{display:flex;align-items:center;gap:12px}
+.av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:21px;flex:none}
+.link-telao{color:#fff;font-size:14px;border:1.5px solid rgba(255,255,255,.4);border-radius:10px;padding:10px 14px;text-decoration:none;font-weight:700}
+.vazio{text-align:center;color:var(--suave);padding:40px 10px;border:1.5px dashed var(--linha);border-radius:14px}
+.login{min-height:100vh;display:grid;place-items:center;padding:20px}
+.caixa{background:#fff;border:1px solid var(--linha);border-radius:16px;padding:30px;width:min(380px,100%)}
+.caixa h1{font-family:var(--disp);font-size:24px}
+.caixa p{color:var(--suave);font-size:14px;margin-top:4px}
+.caixa label{display:block;font-weight:700;font-size:13px;margin-top:16px}
+.caixa input{width:100%;margin-top:6px;padding:12px;border:1.5px solid var(--linha);border-radius:10px}
+.caixa .btn{width:100%;margin-top:18px;background:var(--azul);color:#fff}
+.erro{margin-top:14px;background:#FBE9E7;color:#8A261C;padding:10px 12px;border-radius:10px;font-size:14px}
+.aviso-teste{background:#FFF4D6;color:#6B4B00;padding:10px 14px;font-size:14px;text-align:center}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--marinho);color:#fff;padding:12px 18px;border-radius:10px;font-weight:700;z-index:50}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* TROQUE AQUI: a mesma configuração do Firebase usada no site dos 10 anos */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDrZf4cqozms2S2WAOcSRuEudquKvaRgj8", authDomain: "ecit-recados.firebaseapp.com", projectId: "ecit-recados",
+  storageBucket: "ecit-recados.firebasestorage.app", messagingSenderId: "478817341747", appId: "1:478817341747:web:5cdb75dfeb116fb6d9ae46"
+};
+const MODO_DESIGN = false;   // true = teste com recados de exemplo, sem login e sem Firebase
+
+let DB = null, AUTH = null;
+if(!MODO_DESIGN && typeof firebase !== 'undefined'){
+  try{ firebase.initializeApp(FIREBASE_CONFIG); DB = firebase.firestore(); AUTH = firebase.auth(); }
+  catch(e){ console.error('Firebase não iniciou:', e); }
+}
+
+const AVATARES = [['#2FA35B','⚽'],['#2F62B8','📚'],['#E0A92F','🎵'],['#C0392F','🎨'],['#2C9A87','🔬'],['#7B4FBF','💻'],
+                  ['#E67E22','🏀'],['#16233F','🚀'],['#D6336C','🎭'],['#1B998B','🌱'],['#5C6BC0','📷'],['#8D6E63','🧠']];
+function avatarHtml(i){ const a = AVATARES[i] || AVATARES[0]; return '<span class="av" style="background:'+a[0]+'" aria-hidden="true">'+a[1]+'</span>'; }
+const S = { recados: [], aba: 'pendente', logado: false, email: '', pronto: false };
+const $ = s => document.querySelector(s);
+const esc = t => String(t==null?'':t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const app = $('#app');
+
+function toast(m){ const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2200); }
+function quando(ts){ return ts ? new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''; }
+
+async function mudarStatus(id, status){
+  if(DB) await DB.collection('recados').doc(id).update({ status });
+  else { const r = S.recados.find(x => x.id === id); if(r) r.status = status; render(); }
+  toast(status === 'aprovado' ? 'Frase aprovada e publicada' : 'Frase voltou para pendente');
+}
+async function excluir(id){
+  if(!confirm('Excluir esta frase de vez?')) return;
+  if(DB) await DB.collection('recados').doc(id).delete();
+  else { S.recados = S.recados.filter(x => x.id !== id); render(); }
+  toast('Frase excluída');
+}
+
+function telaLogin(erro){
+  app.innerHTML = '<div class="login"><form class="caixa" id="f-login"><h1>Moderação das frases</h1><p>Acesso só para a equipe da ECIT.</p>'+
+    (erro ? '<div class="erro">'+esc(erro)+'</div>' : '')+
+    '<label for="lg-e">E-mail</label><input id="lg-e" type="email" autocomplete="username">'+
+    '<label for="lg-s">Senha</label><input id="lg-s" type="password" autocomplete="current-password">'+
+    '<button class="btn" type="submit">Entrar</button></form></div>';
+  $('#f-login').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const e = $('#lg-e').value.trim(), s = $('#lg-s').value;
+    if(!e || !s) return telaLogin('Preencha e-mail e senha.');
+    try{ await AUTH.signInWithEmailAndPassword(e, s); }catch(x){ telaLogin('E-mail ou senha incorretos.'); }
+  });
+}
+
+function render(){
+  if(!S.pronto) return;
+  if(!S.logado) return telaLogin();
+  const pend = S.recados.filter(r => r.status === 'pendente'), apr = S.recados.filter(r => r.status === 'aprovado');
+  const lista = (S.aba === 'pendente' ? pend : apr).slice().sort((a,b) => (b.criadoEm||0) - (a.criadoEm||0));
+  app.innerHTML =
+    (MODO_DESIGN ? '<div class="aviso-teste">Modo teste: dados de exemplo, nada é salvo.</div>' : '')+
+    '<header class="topo"><div class="wrap"><div><h1>Moderação das frases</h1><small>'+esc(S.email)+'</small></div>'+
+    '<div style="display:flex;gap:10px;align-items:center"><a class="link-telao" href="telao.html" target="_blank" rel="noopener">Abrir telão</a>'+(AUTH ? '<button class="btn sair" id="sair">Sair</button>' : '')+'</div></div></header>'+
+    '<main class="wrap"><div class="abas">'+
+    '<button class="aba '+(S.aba==='pendente'?'on':'')+'" data-aba="pendente"><b>'+pend.length+'</b>Aguardando aprovação</button>'+
+    '<button class="aba '+(S.aba==='aprovado'?'on':'')+'" data-aba="aprovado"><b>'+apr.length+'</b>Publicados</button></div>'+
+    (lista.map(r =>
+      '<div class="card"><div class="topo-card">'+avatarHtml(r.avatar)+'<div><strong>'+esc(r.nome)+'</strong><div class="meta" style="margin-top:0">'+esc(r.cidade)+' · enviado em '+esc(quando(r.criadoEm))+'</div></div></div><q style="margin-top:12px"><strong>'+esc(r.inicio)+'</strong> '+esc(r.texto)+'</q><div class="acoes">'+
+      (r.status === 'pendente'
+        ? '<button class="btn ok" data-ac="aprovar" data-id="'+esc(r.id)+'">Aprovar e publicar</button><button class="btn no" data-ac="excluir" data-id="'+esc(r.id)+'">Recusar</button>'
+        : '<button class="btn neutro" data-ac="voltar" data-id="'+esc(r.id)+'">Tirar do ar</button><button class="btn no" data-ac="excluir" data-id="'+esc(r.id)+'">Excluir</button>')+
+      '</div></div>').join('') || '<div class="vazio">'+(S.aba==='pendente'?'Nenhuma frase esperando aprovação.':'Nenhuma frase publicada ainda.')+'</div>')+
+    '</main>';
+  document.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { S.aba = b.dataset.aba; render(); }));
+  document.querySelectorAll('[data-ac]').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.id, ac = b.dataset.ac;
+    if(ac === 'aprovar') mudarStatus(id, 'aprovado'); else if(ac === 'voltar') mudarStatus(id, 'pendente'); else excluir(id);
+  }));
+  const sair = $('#sair'); if(sair) sair.addEventListener('click', () => AUTH.signOut());
+}
+
+if(DB){
+  AUTH.onAuthStateChanged(u => {
+    S.logado = !!u; S.email = u ? u.email : '';
+    if(u){
+      DB.collection('recados').onSnapshot(snap => {
+        S.recados = snap.docs.map(d => Object.assign({id:d.id}, d.data())); S.pronto = true; render();
+      }, err => { console.error(err); });
+    } else { S.pronto = true; render(); }
+  });
+} else {
+  const agora = Date.now();
+  S.recados = [
+    { id:'a', nome:'Marina', cidade:'Cidade 2', avatar:3, inicio:'Na ECIT eu quero…', texto:'aprender robótica e fazer amigos.', status:'pendente', criadoEm:agora-600000 },
+    { id:'b', nome:'Caio', cidade:'Cidade 1', avatar:6, inicio:'Meu maior sonho é…', texto:'ser jogador e engenheiro ao mesmo tempo.', status:'pendente', criadoEm:agora-1200000 },
+    { id:'c', nome:'Lúcia', cidade:'Cidade 1', avatar:1, inicio:'Eu espero conseguir…', texto:'passar no vestibular.', status:'aprovado', criadoEm:agora-3600000 },
+  ];
+  S.logado = true; S.email = 'teste@ecit.edu.br'; S.pronto = true; render();
+}
+</script>
+</body>
+</html>
